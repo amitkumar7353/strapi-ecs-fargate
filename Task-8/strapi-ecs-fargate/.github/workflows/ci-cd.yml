@@ -1,0 +1,35 @@
+name: CI/CD Strapi ECS Fargate
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region:            ${{ secrets.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build & push Docker image
+        run: |
+          docker build -t strapi-app ./strapi-app
+          docker tag strapi-app:latest ${{ steps.login-ecr.outputs.registry }}/strapi-app:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/strapi-app:latest
+
+      - name: Terraform init & apply
+        run: |
+          cd terraform
+          terraform init -input=false
+          terraform apply -auto-approve
+
